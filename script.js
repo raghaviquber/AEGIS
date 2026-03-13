@@ -1,225 +1,196 @@
-let map
-let marker
-let watchID
-let checkTimer
+let map, directionsService, directionsRenderer, placesService;
+let userMarker, watchID, checkTimer;
+let mediaRecorder, audioChunks = [];
+let isRecording = false;
 
-let contact1=""
-let contact2=""
-let routes=[]
-let selectedRoute
-
-let mediaRecorder
-let audioChunks=[]
-
-function generateRoutes(){
-
-let r1={
-name:"Route A (Fastest)",
-coords:[
-[16.5062,80.6480],
-[16.5080,80.6500],
-[16.5100,80.6530]
-],
-safety:65
+// 1. Navigation Flow
+function showSetup() {
+    document.getElementById("introScreen").style.transform = "translateY(-100%)";
+    setTimeout(() => {
+        document.getElementById("introScreen").classList.add("hidden");
+        document.getElementById("setupScreen").classList.remove("hidden");
+    }, 500);
 }
 
-let r2={
-name:"Route B (Safest)",
-coords:[
-[16.5062,80.6480],
-[16.5075,80.6515],
-[16.5095,80.6540]
-],
-safety:85
+function startNavigation() {
+    const dest = document.getElementById("destInput").value;
+    const p1 = document.getElementById("phone1").value;
+
+    if (!dest || !p1) {
+        alert("Please enter destination and contact number.");
+        return;
+    }
+
+    document.getElementById("setupScreen").classList.add("hidden");
+    document.getElementById("journeyScreen").classList.remove("hidden");
+
+    initMap(dest);
 }
 
-routes=[r1,r2]
+// 2. Google Maps Logic
+function initMap(destination) {
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({
+        polylineOptions: {
+            strokeColor: "#ff758c",
+            strokeWeight: 6
+        }
+    });
 
-selectedRoute=r2
+    navigator.geolocation.getCurrentPosition(pos => {
+        const myLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
 
-document.getElementById("routeInfo").innerHTML=
-`
-${r1.name} – Safety ${r1.safety}<br>
-${r2.name} – Safety ${r2.safety} ⭐ Recommended
-`
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: myLocation,
+            zoom: 15,
+            disableDefaultUI: true,
+            styles: pinkSoftStyle 
+        });
 
-document.getElementById("startScreen").classList.add("hidden")
-document.getElementById("routeScreen").classList.remove("hidden")
+        directionsRenderer.setMap(map);
 
+        // Draw actual path line
+        directionsService.route({
+            origin: myLocation,
+            destination: destination,
+            travelMode: 'WALKING'
+        }, (result, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(result);
+                // After route is loaded, find police along the path
+                plotPoliceStations(result.routes[0].overview_path);
+            } else {
+                alert("Could not find a path to that destination.");
+            }
+        });
+
+        // Current location dot
+        userMarker = new google.maps.Marker({
+            position: myLocation,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#ff0844",
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 2
+            }
+        });
+
+        startGpsTracking();
+        startSafetyCheckTimer();
+    });
 }
 
-function startJourney(){
+// 3. Real Police Detection (No Bluff)
+function plotPoliceStations(pathPoints) {
+    placesService = new google.maps.places.PlacesService(map);
+    
+    // Check start, middle, and end of the route for police
+    const searchLocations = [
+        pathPoints[0], 
+        pathPoints[Math.floor(pathPoints.length / 2)], 
+        pathPoints[pathPoints.length - 1]
+    ];
 
-contact1=document.getElementById("contact1").value
-contact2=document.getElementById("contact2").value
+    searchLocations.forEach(loc => {
+        const request = {
+            location: loc,
+            radius: '1500',
+            type: ['police']
+        };
 
-let interval=document.getElementById("timer").value
-
-document.getElementById("routeScreen").classList.add("hidden")
-document.getElementById("journeyScreen").classList.remove("hidden")
-
-initMap(selectedRoute.coords[0])
-
-drawRoutes()
-
-watchLocation()
-
-checkTimer=setInterval(checkSafety,interval)
-
+        placesService.nearbySearch(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK) {
+                results.forEach(place => {
+                    new google.maps.Marker({
+                        position: place.geometry.location,
+                        map: map,
+                        title: place.name,
+                        icon: "https://maps.google.com/mapfiles/kml/paddle/police.png"
+                    });
+                });
+            }
+        });
+    });
 }
 
-function checkSafety(){
-
-let reply=prompt("AEGIS Safety Check\nType SAFE")
-
-if(!reply || reply.toLowerCase()!=="safe"){
-
-triggerAlert()
-
+function findPolice() {
+    alert("Scanning area for nearest police help...");
+    plotPoliceStations([map.getCenter()]);
 }
 
+// 4. Audio Evidence Recording
+async function toggleRecording() {
+    const btn = document.getElementById("recBtn");
+    const indicator = document.getElementById("recIndicator");
+
+    if (!isRecording) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "AEGIS_Evidence.webm";
+                a.click(); // Automatically "saves" to device
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            btn.innerText = "🛑 Stop Recording";
+            indicator.style.display = "block";
+        } catch (err) {
+            alert("Mic permission denied!");
+        }
+    } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.innerText = "🎙 Start Recording";
+        indicator.style.display = "none";
+        alert("Recording saved as Evidence.");
+    }
 }
 
-function initMap(start){
+// 5. Emergency SOS (Real SMS Protocol)
+function triggerSOS() {
+    const phone = document.getElementById("phone1").value;
+    const lat = userMarker.getPosition().lat();
+    const lng = userMarker.getPosition().lng();
+    const msg = `EMERGENCY! I feel unsafe. Track me: https://www.google.com/maps?q=${lat},${lng}`;
 
-map=L.map('map').setView(start,15)
-
-L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{maxZoom:19}).addTo(map)
-
-marker=L.marker(start).addTo(map)
-
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+    alert("Opening Messaging App... Send the prepared SOS!");
 }
 
-function drawRoutes(){
-
-routes.forEach(r=>{
-
-let color=r.safety>80?"green":"red"
-
-L.polyline(r.coords,{color:color}).addTo(map)
-
-})
-
+function fakeCall() {
+    alert("📞 INCOMING CALL: 'Dad'\n'Hey, I'm watching your live location. Keep walking.'");
 }
 
-function watchLocation(){
-
-watchID=navigator.geolocation.watchPosition(pos=>{
-
-let lat=pos.coords.latitude
-let lon=pos.coords.longitude
-
-marker.setLatLng([lat,lon])
-
-document.getElementById("location").innerHTML=
-"📍 "+lat+", "+lon
-
-detectDeviation(lat,lon)
-
-})
-
+function startGpsTracking() {
+    watchID = navigator.geolocation.watchPosition(pos => {
+        const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        userMarker.setPosition(newPos);
+    });
 }
 
-function detectDeviation(lat,lon){
-
-let safePoint=selectedRoute.coords[1]
-
-let dist=Math.sqrt(
-Math.pow(lat-safePoint[0],2)+
-Math.pow(lon-safePoint[1],2)
-)
-
-if(dist>0.01){
-
-triggerAlert()
-
+function startSafetyCheckTimer() {
+    const interval = parseInt(document.getElementById("timerVal").value);
+    checkTimer = setInterval(() => {
+        const safe = confirm("AEGIS SAFETY CHECK: Are you okay? (Clicking CANCEL triggers SOS)");
+        if (!safe) triggerSOS();
+    }, interval);
 }
 
-}
-
-function triggerAlert(){
-
-clearInterval(checkTimer)
-
-document.getElementById("alertScreen").classList.remove("hidden")
-
-}
-
-function reportArea(){
-
-navigator.geolocation.getCurrentPosition(pos=>{
-
-let lat=pos.coords.latitude
-let lon=pos.coords.longitude
-
-L.circle([lat,lon],
-{radius:100,color:"red"})
-.addTo(map)
-
-})
-
-}
-
-function findNearbyPolice(){
-
-navigator.geolocation.getCurrentPosition(pos=>{
-
-let lat=pos.coords.latitude
-let lon=pos.coords.longitude
-
-let url=
-"https://overpass-api.de/api/interpreter?data=[out:json];node[amenity=police](around:1500,"+lat+","+lon+");out;"
-
-fetch(url)
-.then(r=>r.json())
-.then(data=>{
-
-data.elements.forEach(p=>{
-
-L.marker([p.lat,p.lon])
-.addTo(map)
-.bindPopup("🚓 Police Station")
-
-})
-
-})
-
-})
-
-}
-
-function fakeCall(){
-
-alert("📞 Incoming Call: MOM\n'Are you reaching home soon? I'm tracking your location.'")
-
-}
-
-async function startRecording(){
-
-let stream=await navigator.mediaDevices.getUserMedia({audio:true})
-
-mediaRecorder=new MediaRecorder(stream)
-
-mediaRecorder.start()
-
-alert("Recording started")
-
-mediaRecorder.ondataavailable=e=>{
-audioChunks.push(e.data)
-}
-
-}
-
-function endJourney(){
-
-navigator.geolocation.clearWatch(watchID)
-
-clearInterval(checkTimer)
-
-alert("Journey ended safely")
-
-location.reload()
-
-}
+// Custom Pink Style for Map
+const pinkSoftStyle = [
+    { "featureType": "water", "stylers": [{ "color": "#eafbff" }] },
+    { "featureType": "road", "stylers": [{ "color": "#ffffff" }] },
+    { "featureType": "landscape", "stylers": [{ "color": "#fdf1f3" }] }
+];

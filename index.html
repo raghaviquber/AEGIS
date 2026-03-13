@@ -1,138 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>AEGIS – Intelligent Safety Navigation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS | Intelligent Safety Navigation</title>
+    
+    <!-- Google Maps API with Directions and Places libraries -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC_zQj5a2NXkciAGiYTJSLJ5KCILtAk9v8&libraries=places,directions"></script>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --main-pink: #ff758c;
+            --dark-pink: #ff5e78;
+            --soft-white: #fffafa;
+            --gradient: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%);
+        }
 
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+        body, html {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--soft-white);
+            height: 100vh; overflow: hidden;
+        }
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        .app-container {
+            width: 100%; max-width: 450px;
+            height: 100vh; margin: auto;
+            background: white; position: relative;
+            display: flex; flex-direction: column;
+            box-shadow: 0 0 30px rgba(0,0,0,0.1);
+        }
 
-<style>
+        /* INTRO SCREEN */
+        #introScreen {
+            position: absolute; z-index: 100;
+            width: 100%; height: 100%;
+            background: var(--gradient);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: white; text-align: center;
+            transition: 0.5s;
+        }
 
-body{
-font-family:Arial;
-background:linear-gradient(135deg,#4a00e0,#ff3e6c);
-margin:0;
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-}
+        .logo-circle {
+            width: 120px; height: 120px;
+            background: white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 50px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
 
-.app{
-width:380px;
-text-align:center;
-color:white;
-}
+        /* SETUP SCREEN */
+        .header {
+            background: var(--gradient);
+            padding: 20px; text-align: center; color: white;
+        }
 
-.card{
-background:white;
-color:black;
-padding:20px;
-border-radius:15px;
-margin-bottom:15px;
-}
+        .card {
+            padding: 25px; margin: 15px;
+            background: white; border-radius: 25px;
+            box-shadow: 0 10px 25px rgba(255, 117, 140, 0.15);
+        }
 
-input,select{
-width:90%;
-padding:10px;
-margin:8px;
-}
+        input, select {
+            width: 100%; padding: 14px; margin: 10px 0;
+            border-radius: 12px; border: 1px solid #ffe0e6;
+            background: #fff9fa; box-sizing: border-box;
+        }
 
-button{
-width:90%;
-padding:12px;
-margin:6px;
-border:none;
-border-radius:8px;
-background:#ff3e6c;
-color:white;
-font-weight:bold;
-}
+        button {
+            width: 100%; padding: 16px; margin: 10px 0;
+            border: none; border-radius: 15px;
+            background: var(--gradient); color: white;
+            font-weight: bold; cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 117, 140, 0.3);
+        }
 
-#map{
-height:260px;
-}
+        /* JOURNEY SCREEN */
+        #map { flex-grow: 1; width: 100%; }
 
-.hidden{
-display:none;
-}
+        .floating-controls {
+            position: absolute; bottom: 30px;
+            width: 100%; display: flex; flex-direction: column;
+            align-items: center; pointer-events: none;
+        }
 
-</style>
+        .control-panel {
+            width: 90%; background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px); padding: 15px;
+            border-radius: 25px; pointer-events: auto;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+        }
 
+        .btn-sos { background: #ff0844; grid-column: span 2; }
+        .btn-secondary { background: white; color: var(--main-pink); border: 1px solid var(--main-pink); }
+        .btn-record { background: #444; color: white; }
+
+        .hidden { display: none !important; }
+        
+        /* Recording indicator */
+        #recIndicator {
+            color: red; font-weight: bold; font-size: 12px;
+            text-align: center; grid-column: span 2; display: none;
+        }
+    </style>
 </head>
-
 <body>
 
-<div class="app">
+<div class="app-container">
+    
+    <!-- 1. INTRO PAGE -->
+    <div id="introScreen">
+        <div class="logo-circle">🛡</div>
+        <h1 style="margin:0">AEGIS</h1>
+        <p style="opacity:0.9">AI-Powered Personal Shield</p>
+        <button onclick="showSetup()" style="width: 200px; background: white; color: var(--main-pink);">GET STARTED</button>
+    </div>
 
-<h2>🛡 AEGIS</h2>
-<p>AI Safety Navigation System</p>
+    <!-- 2. SETUP PAGE -->
+    <div id="setupScreen" class="hidden" style="overflow-y: auto;">
+        <div class="header">
+            <h2>Plan Secure Trip</h2>
+        </div>
+        <div class="card">
+            <input id="destInput" placeholder="Where are you going?">
+            <input id="phone1" placeholder="Primary Contact Phone">
+            <input id="phone2" placeholder="Secondary Contact Phone">
+            
+            <p style="font-size: 12px; color: #888; margin-top: 15px;">Safety Check-in Interval:</p>
+            <select id="timerVal">
+                <option value="60000">1 Minute (Max Security)</option>
+                <option value="300000" selected>5 Minutes (Normal)</option>
+            </select>
 
-<div class="card" id="startScreen">
+            <button onclick="startNavigation()">START SECURE NAVIGATION</button>
+        </div>
+    </div>
 
-<h3>Plan Safe Journey</h3>
-
-<input id="destination" placeholder="Destination">
-
-<input id="contact1" placeholder="Emergency Contact 1">
-
-<input id="contact2" placeholder="Emergency Contact 2">
-
-<select id="timer">
-<option value="300000">Check-in every 5 minutes</option>
-<option value="120000">Check-in every 2 minutes</option>
-</select>
-
-<button onclick="generateRoutes()">
-Find Safe Routes
-</button>
-
-</div>
-
-<div class="card hidden" id="routeScreen">
-
-<h3>Recommended Routes</h3>
-
-<p id="routeInfo"></p>
-
-<button onclick="startJourney()">Start Journey</button>
-
-</div>
-
-<div class="card hidden" id="journeyScreen">
-
-<h3>Journey Monitoring</h3>
-
-<div id="map"></div>
-
-<p id="location"></p>
-
-<button onclick="findNearbyPolice()">Nearby Police</button>
-
-<button onclick="reportArea()">Report Unsafe Area</button>
-
-<button onclick="fakeCall()">Fake Call</button>
-
-<button onclick="startRecording()">Start Audio Recording</button>
-
-<button onclick="endJourney()">End Journey</button>
-
-</div>
-
-<div class="card hidden" id="alertScreen">
-
-<h3>🚨 ALERT</h3>
-<p>Possible danger detected.</p>
-
-</div>
+    <!-- 3. MAP/JOURNEY PAGE -->
+    <div id="journeyScreen" class="hidden" style="display: contents;">
+        <div id="map"></div>
+        
+        <div class="floating-controls">
+            <div class="control-panel">
+                <div id="recIndicator">● RECORDING AUDIO EVIDENCE...</div>
+                <button class="btn-secondary" onclick="findPolice()">🚔 Show Police</button>
+                <button class="btn-secondary" onclick="fakeCall()">📞 Fake Call</button>
+                <button class="btn-record" id="recBtn" onclick="toggleRecording()">🎙 Start Recording</button>
+                <button class="btn-secondary" onclick="location.reload()">🛑 End Journey</button>
+                <button class="btn-sos" onclick="triggerSOS()">🚨 SEND SOS TO CONTACTS</button>
+            </div>
+        </div>
+    </div>
 
 </div>
 
 <script src="script.js"></script>
-
 </body>
 </html>
