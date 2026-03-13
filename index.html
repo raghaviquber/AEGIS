@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AEGIS – Intelligent Safety Navigation</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#4a00e0,#ff3e6c);
+margin:0;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.app{
+width:380px;
+text-align:center;
+color:white;
+}
+
+.card{
+background:white;
+color:black;
+padding:20px;
+border-radius:15px;
+margin-bottom:15px;
+}
+
+input,select{
+width:90%;
+padding:10px;
+margin:8px;
+}
+
+button{
+width:90%;
+padding:12px;
+margin:6px;
+border:none;
+border-radius:8px;
+background:#ff3e6c;
+color:white;
+font-weight:bold;
+}
+
+#map{
+height:260px;
+}
+
+.hidden{
+display:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="app">
+
+<h2>🛡 AEGIS</h2>
+<p>AI Safety Navigation System</p>
+
+<div class="card" id="startScreen">
+
+<h3>Plan Safe Journey</h3>
+
+<input id="destination" placeholder="Destination">
+
+<input id="contact1" placeholder="Emergency Contact 1">
+
+<input id="contact2" placeholder="Emergency Contact 2">
+
+<select id="timer">
+<option value="300000">Check-in every 5 minutes</option>
+<option value="120000">Check-in every 2 minutes</option>
+</select>
+
+<button onclick="generateRoutes()">
+Find Safe Routes
+</button>
+
+</div>
+
+<div class="card hidden" id="routeScreen">
+
+<h3>Recommended Routes</h3>
+
+<p id="routeInfo"></p>
+
+<button onclick="startJourney()">Start Journey</button>
+
+</div>
+
+<div class="card hidden" id="journeyScreen">
+
+<h3>Journey Monitoring</h3>
+
+<div id="map"></div>
+
+<p id="location"></p>
+
+<button onclick="findNearbyPolice()">Nearby Police</button>
+
+<button onclick="reportArea()">Report Unsafe Area</button>
+
+<button onclick="fakeCall()">Fake Call</button>
+
+<button onclick="startRecording()">Start Audio Recording</button>
+
+<button onclick="endJourney()">End Journey</button>
+
+</div>
+
+<div class="card hidden" id="alertScreen">
+
+<h3>🚨 ALERT</h3>
+<p>Possible danger detected.</p>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
